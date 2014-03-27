@@ -15,9 +15,9 @@ use Doctrine\Common\Cache\PhpFileCache;
 class CustomProvider extends Provider
 {
     //open up scope for protected Provider's validateDigest-method
-    public function validateDigest($digest, $nonce, $created, $secret, $salt)
+    public function validateDigest($user, $digest, $nonce, $created, $secret)
     {
-        return parent::validateDigest($digest, $nonce, $created, $secret, $salt);
+        return parent::validateDigest($user, $digest, $nonce, $created, $secret);
     }
 }
 
@@ -108,7 +108,7 @@ class ProviderTest extends \PHPUnit_Framework_TestCase
     public function validateDigestExpireTime()
     {
         $provider = new CustomProvider($this->userProvider, $this->encoder, $this->nonceCache);
-        $provider->validateDigest(null, null, date('r', (time() - 86400)), null, null);
+        $provider->validateDigest(null, null, null, date('r', (time() - 86400)), null);
     }
     
     /**
@@ -119,10 +119,10 @@ class ProviderTest extends \PHPUnit_Framework_TestCase
      * @param $created
      * @param $secret
      */
-    public function validateDigestWithoutNonceDir($digest, $nonce, $created, $secret, $salt, $expected)
+    public function validateDigestWithoutNonceDir($digest, $nonce, $created, $secret, $expected)
     {
         $provider = new CustomProvider($this->userProvider, $this->encoder, $this->nonceCache);
-        $result = $provider->validateDigest($digest, $nonce, $created, $secret, $salt);
+        $result = $provider->validateDigest($this->user, $digest, $nonce, $created, $secret);
         $this->assertEquals($expected, $result);
     }
 
@@ -134,17 +134,17 @@ class ProviderTest extends \PHPUnit_Framework_TestCase
      * @param $created
      * @param $secret
      */
-    public function validateDigestWithNonceDir($digest, $nonce, $created, $secret, $salt, $expected)
+    public function validateDigestWithNonceDir($digest, $nonce, $created, $secret, $expected)
     {
         $provider = new CustomProvider($this->userProvider, $this->encoder, $this->nonceCache);
-        $result = $provider->validateDigest($digest, $nonce, $created, $secret, $salt);
+        $result = $provider->validateDigest($this->user, $digest, $nonce, $created, $secret);
         $this->assertEquals($expected, $result);
 
         $this->assertTrue($this->nonceCache->contains($nonce));
 
         try
         {
-          $result = $provider->validateDigest($digest, $nonce, $created, $secret, $salt);
+          $result = $provider->validateDigest($this->user, $digest, $nonce, $created, $secret);
           $this->fail('NonceExpiredException expected');
         }
         catch(NonceExpiredException $e)
@@ -162,13 +162,13 @@ class ProviderTest extends \PHPUnit_Framework_TestCase
      * @param $created
      * @param $secret
      */
-    public function validateDigestWithNonceDirExpectedException($digest, $nonce, $created, $secret, $salt, $expected)
+    public function validateDigestWithNonceDirExpectedException($digest, $nonce, $created, $secret, $expected)
     {
         $provider = new CustomProvider($this->userProvider, $this->encoder, $this->nonceCache);
 
         $this->nonceCache->save($nonce, time() - 123, 0);
 
-        $provider->validateDigest($digest, $nonce, $created, $salt, $secret, $salt);
+        $provider->validateDigest($this->user, $digest, $nonce, $created, $secret);
 
         $this->nonceCache->delete($nonce);
     }
@@ -187,7 +187,7 @@ class ProviderTest extends \PHPUnit_Framework_TestCase
                 $time,
                 'somesecret'
             ),
-            ''
+            ""
         );
 
         $digest_slash = $encoder->encodePassword(
@@ -197,15 +197,15 @@ class ProviderTest extends \PHPUnit_Framework_TestCase
                 $time,
                 'somesecret'
             ),
-            ''
+            ""
         );
 
         return array(
-            array($digest, base64_encode('somenonce'), $time, 'somesecret', '', true),
-            array($digest, base64_encode('somenonce'), $time, 'somewrongsecret', '', false),
-            array($digest, base64_encode('somewrongnonce'), $time, 'somesecret', '', false),
-            array($digest. '9', base64_encode('somenonce'), $time, 'somesecret', '', false),
-            array($digest_slash, base64_encode('s/o/m/e/n/o/n/c/e'), $time, 'somesecret', '', true)
+            array($digest, base64_encode('somenonce'), $time, 'somesecret', true),
+            array($digest, base64_encode('somenonce'), $time, 'somewrongsecret', false),
+            array($digest, base64_encode('somewrongnonce'), $time, 'somesecret', false),
+            array($digest. '9', base64_encode('somenonce'), $time, 'somesecret', false),
+            array($digest_slash, base64_encode('s/o/m/e/n/o/n/c/e'), $time, 'somesecret', true)
         );
     }
 
@@ -251,7 +251,7 @@ class ProviderTest extends \PHPUnit_Framework_TestCase
                 $time,
                 'somesecret'
             ),
-            ''
+            ""
         );
 
         $token = new Token();
